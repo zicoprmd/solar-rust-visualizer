@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Solar Rust Visualizer</title>
+    <style>
+        body { font-family: sans-serif; display: flex; height: 100vh; margin: 0; }
+        #sidebar { width: 250px; background: #2c3e50; color: white; padding: 20px; }
+        #canvas { flex-grow: 1; position: relative; background: #ecf0f1; overflow: hidden; }
+        .component { 
+            width: 100px; padding: 10px; background: white; border: 2px solid #34495e; 
+            position: absolute; cursor: pointer; text-align: center; border-radius: 8px;
+        }
+        .selected { border-color: #e74c3c; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
+        .btn { background: #3498db; color: white; border: none; padding: 10px; width: 100%; margin-bottom: 10px; cursor: pointer; }
+        #stats { margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px; }
+        #wire-layer {
+    pointer-events: none; /* Garis tidak boleh menghalangi klik ke kotak */
+    z-index: 1;
+}
+#components-layer {
+    z-index: 2;
+    position: relative;
+}
+.selected { 
+    outline: 3px solid #f1c40f; /* Warna kuning agar terlihat jelas saat dipilih */
+}
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h3>Menu Komponen</h3>
+        <button class="btn" onclick="addComponent('panel', 300)">+ Tambah Panel (300W)</button>
+        <button class="btn" onclick="addComponent('inverter', 0.9)">+ Tambah Inverter</button>
+        <button class="btn" onclick="addComponent('battery', 1200)">+ Tambah Baterai (1.2kWh)</button>
+        <div id="stats">
+            <strong>Output Sistem:</strong>
+            <h2 id="power-display">0.00 kW</h2>
+            <small>*Klik 2 komponen berurutan untuk menyambungkan kabel</small>
+        </div>
+    </div>
+    <div id="canvas">
+    <svg id="wire-layer" style="position:absolute; width:100%; height:100%; pointer-events:none;"></svg>
+    <div id="components-layer"></div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
