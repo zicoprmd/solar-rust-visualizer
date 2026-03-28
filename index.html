@@ -4,16 +4,37 @@
     <meta charset="UTF-8">
     <title>Solar Rust Visualizer</title>
     <style>
-        body { font-family: sans-serif; display: flex; height: 100vh; margin: 0; }
-        #sidebar { width: 250px; background: #2c3e50; color: white; padding: 20px; }
+        body { font-family: sans-serif; display: flex; height: 100vh; margin: 0; overflow: hidden; }
+        #sidebar { width: 280px; background: #2c3e50; color: white; padding: 20px; overflow-y: auto; height: 100vh; box-sizing: border-box; }
         #canvas { flex-grow: 1; position: relative; background: #ecf0f1; overflow: hidden; }
-        .component { 
-            width: 100px; padding: 10px; background: white; border: 2px solid #34495e; 
+        .component {
+            width: 100px; padding: 10px; background: white; border: 2px solid #34495e;
             position: absolute; cursor: pointer; text-align: center; border-radius: 8px;
         }
         .selected { border-color: #e74c3c; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
-        .btn { background: #3498db; color: white; border: none; padding: 10px; width: 100%; margin-bottom: 10px; cursor: pointer; }
+        .btn { background: #3498db; color: white; border: none; padding: 10px; width: 100%; margin-bottom: 10px; cursor: pointer; border-radius: 5px; }
+        .btn:hover { background: #2980b9; }
         #stats { margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px; }
+        #savings { margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px; }
+        #savings input { width: 100%; padding: 5px; margin-top: 5px; box-sizing: border-box; border-radius: 4px; border: none; }
+        #savings table { width: 100%; margin-top: 10px; font-size: 12px; }
+        #savings td { padding: 2px 0; }
+        #savings hr { border: none; border-top: 1px solid #7f8c8d; margin: 10px 0; }
+        .input-group { margin-bottom: 10px; }
+        #chart-section { margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px; }
+        #chart-section canvas { background: rgba(255,255,255,0.1); border-radius: 8px; margin-top: 10px; }
+        .tab-buttons { display: flex; gap: 5px; margin-bottom: 10px; }
+        .tab-btn { flex: 1; padding: 8px 5px; font-size: 11px; background: #34495e; border: none; color: white; border-radius: 4px; cursor: pointer; }
+        .tab-btn.active { background: #3498db; }
+        #efficiency-section { margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px; }
+        #efficiency-section .flow-bar { display: flex; align-items: center; margin: 5px 0; font-size: 11px; }
+        #efficiency-section .flow-bar span { width: 80px; }
+        #efficiency-section .bar-container { flex: 1; height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; margin: 0 8px; }
+        #efficiency-section .bar { height: 100%; background: #f1c40f; border-radius: 6px; transition: width 0.3s; }
+        #efficiency-section .bar.loss { background: #e74c3c; }
+        #efficiency-section .flow-label { width: 55px; text-align: right; font-size: 10px; color: #bdc3c7; }
+        #efficiency-section .overall-eff { text-align: center; margin-top: 10px; padding: 8px; background: rgba(46, 204, 113, 0.2); border-radius: 8px; }
+        #efficiency-section .overall-eff span { font-size: 18px; font-weight: bold; color: #2ecc71; }
         #wire-layer {
     pointer-events: none; /* Garis tidak boleh menghalangi klik ke kotak */
     z-index: 1;
@@ -37,6 +58,66 @@
             <strong>Output Sistem:</strong>
             <h2 id="power-display">0.00 kW</h2>
             <small>*Klik 2 komponen berurutan untuk menyambungkan kabel</small>
+        </div>
+        <div id="savings">
+            <strong>Kalkulator Penghematan:</strong>
+            <div class="input-group">
+                <label>Tarif Listrik (Rp/kWh):</label>
+                <input type="number" id="rate" value="1500" min="0" step="100" onchange="window.onrateChange()">
+            </div>
+            <div id="savings-result">
+                <table>
+                    <tr><td>Harian:</td><td id="daily-kwh">0.00 kWh</td><td id="daily-rupiah">Rp 0</td></tr>
+                    <tr><td>Bulanan:</td><td id="monthly-kwh">0.00 kWh</td><td id="monthly-rupiah">Rp 0</td></tr>
+                    <tr><td>Tahunan:</td><td id="yearly-kwh">0.00 kWh</td><td id="yearly-rupiah">Rp 0</td></tr>
+                </table>
+                <hr>
+                <strong>Pengurangan CO2:</strong>
+                <table>
+                    <tr><td>Harian:</td><td id="daily-co2">0.00 kg</td></tr>
+                    <tr><td>Bulanan:</td><td id="monthly-co2">0.00 kg</td></tr>
+                    <tr><td>Tahunan:</td><td id="yearly-co2">0.00 kg</td></tr>
+                </table>
+            </div>
+        </div>
+        <div id="efficiency-section">
+            <strong>Efisiensi Sistem:</strong>
+            <div id="eff-panel" class="flow-bar">
+                <span>☀️ Panel</span>
+                <div class="bar-container"><div id="bar-panel" class="bar" style="width:100%"></div></div>
+                <div class="flow-label" id="val-panel">0W</div>
+            </div>
+            <div id="eff-wiring" class="flow-bar">
+                <span>🔌 Kabel</span>
+                <div class="bar-container"><div id="bar-wiring" class="bar" style="width:98%"></div></div>
+                <div class="flow-label" id="val-wiring">-0W</div>
+            </div>
+            <div id="eff-charge" class="flow-bar">
+                <span>⚡ Charge</span>
+                <div class="bar-container"><div id="bar-charge" class="bar" style="width:93%"></div></div>
+                <div class="flow-label" id="val-charge">-0W</div>
+            </div>
+            <div id="eff-inverter" class="flow-bar">
+                <span>🔄 Inverter</span>
+                <div class="bar-container"><div id="bar-inverter" class="bar" style="width:89%"></div></div>
+                <div class="flow-label" id="val-inverter">-0W</div>
+            </div>
+            <div id="eff-battery" class="flow-bar">
+                <span>🔋 Battery</span>
+                <div class="bar-container"><div id="bar-battery" class="bar loss" style="width:80%"></div></div>
+                <div class="flow-label" id="val-battery">-0W</div>
+            </div>
+            <div class="overall-eff">
+                <span id="overall-eff">0%</span> Efisiensi Total
+            </div>
+        </div>
+        <div id="chart-section">
+            <strong>Grafik Produksi:</strong>
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="setChartMode('daily')">Harian</button>
+                <button class="tab-btn" onclick="setChartMode('weekly')">Mingguan</button>
+            </div>
+            <canvas id="production-chart" width="240" height="120"></canvas>
         </div>
     </div>
     <div id="canvas">
