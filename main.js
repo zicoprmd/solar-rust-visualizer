@@ -23,36 +23,7 @@ function render() {
     const wireLayer = document.getElementById("wire-layer");
     compLayer.innerHTML = "";
     wireLayer.innerHTML = "";
-    // Di dalam function render() di main.js:
-
-    const result = calculate_solar_power({ components, connections });
-    const display = document.getElementById("power-display");
-
-    if (display) {
-        // Tentukan warna berdasarkan status pesan
-        const statusColor = result.message.includes("⚠️") ? "#e67e22" : 
-                            result.message.includes("✅") ? "#2ecc71" : "#95a5a6";
-
-        display.innerHTML = `
-            <div style="font-size: 1.8em; font-weight: bold; color: #2ecc71;">
-                ${result.ac_output.toFixed(2)} kW
-            </div>
-            <div style="margin: 5px 0; color: #7f8c8d;">
-                📦 Kapasitas: ${result.storage_capacity} Wh
-            </div>
-            <div style="
-                margin-top: 10px; 
-                padding: 8px; 
-                border-radius: 5px; 
-                background: rgba(0,0,0,0.05); 
-                color: ${statusColor}; 
-                font-size: 0.9em; 
-                font-weight: bold;
-            ">
-                ${result.message}
-            </div>
-        `;
-    }
+    
 
     // 1. Gambar Kabel (SVG)
     connections.forEach(conn => {
@@ -102,12 +73,34 @@ function render() {
     });
 
     // 3. Panggil Rust
+    // Di dalam function render() di main.js:
+
     const result = calculate_solar_power({ components, connections });
     const display = document.getElementById("power-display");
-    if(display) {
+
+    if (display) {
+        // Tentukan warna berdasarkan status pesan
+        const statusColor = result.message.includes("⚠️") ? "#e67e22" : 
+                            result.message.includes("✅") ? "#2ecc71" : "#95a5a6";
+
         display.innerHTML = `
-            <span style="font-size: 1.5em; color: #2ecc71;">${result.ac_output.toFixed(2)} kW</span><br>
-            <small>Penyimpanan: ${result.storage_capacity} Wh</small>
+            <div style="font-size: 1.8em; font-weight: bold; color: #2ecc71;">
+                ${result.ac_output.toFixed(2)} kW
+            </div>
+            <div style="margin: 5px 0; color: #7f8c8d;">
+                📦 Kapasitas: ${result.storage_capacity} Wh
+            </div>
+            <div style="
+                margin-top: 10px; 
+                padding: 8px; 
+                border-radius: 5px; 
+                background: rgba(0,0,0,0.05); 
+                color: ${statusColor}; 
+                font-size: 0.9em; 
+                font-weight: bold;
+            ">
+                ${result.message}
+            </div>
         `;
     }
 }
