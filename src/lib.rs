@@ -1,12 +1,23 @@
 use wasm_bindgen::prelude::*;
 use serde::Deserialize;
-// Serialize dihapus karena memang belum terpakai (menghilangkan warning)
 
 #[derive(Deserialize)]
 pub struct SolarComponent {
     pub id: String,
     pub kind: String,
     pub value: f64,
+    #[serde(default)]
+    pub voltage: f64,
+    #[serde(default)]
+    pub amps: f64,
+    #[serde(default)]
+    pub watt: f64,
+    #[serde(default)]
+    pub ah: f64,
+    #[serde(default)]
+    pub inv_type: String,
+    #[serde(default)]
+    pub eff: f64,
 }
 
 #[derive(Deserialize)]
@@ -28,37 +39,85 @@ pub fn calculate_solar_power(js_data: JsValue) -> JsValue {
         Err(_) => return serde_wasm_bindgen::to_value(&0.0).unwrap(),
     };
 
-    // 1. Cek apakah ada inverter yang terhubung ke sesuatu?
+    // Cek apakah ada inverter yang terhubung ke sesuatu?
     let has_connected_inverter = scene.components.iter().any(|c| {
-        c.kind == "inverter" && scene.connections.iter().any(|conn| 
+        c.kind == "inverter" && scene.connections.iter().any(|conn|
+            conn.from_id == c.id || conn.to_id == c.id
+        )
+    });
+
+    // Cek apakah ada MPPT yang terhubung
+    let has_connected_mppt = scene.components.iter().any(|c| {
+        c.kind == "mppt" && scene.connections.iter().any(|conn|
             conn.from_id == c.id || conn.to_id == c.id
         )
     });
 
     let mut total_panel_watt = 0.0;
     let mut total_storage = 0.0;
+    let mut has_battery = false;
 
-    // 2. Hitung semua panel yang terhubung
+    // Hitung semua panel yang terhubung ke MPPT
     for comp in &scene.components {
-        let is_connected = scene.connections.iter().any(|conn| {
-            conn.from_id == comp.id || conn.to_id == comp.id
-        });
+        if comp.kind == "panel" {
+            // Panel harus terhubung ke MPPT (atau langsung ke inverter dengan MPPT built-in)
+            let is_connected_to_mppt = scene.connections.iter().any(|conn| {
+                if conn.from_id == comp.id || conn.to_id == comp.id {
+                    let other_id = if conn.from_id == comp.id { &conn.to_id } else { &conn.from_id };
+                    scene.components.iter().any(|c| c.id == *other_id && c.kind == "mppt")
+                } else {
+                    false
+                }
+            });
 
-        if is_connected {
-            if comp.kind == "panel" {
+            // Atau terhubung langsung ke hybrid inverter (yang punya MPPT built-in)
+            let is_connected_to_hybrid = scene.connections.iter().any(|conn| {
+                if conn.from_id == comp.id || conn.to_id == comp.id {
+                    let other_id = if conn.from_id == comp.id { &conn.to_id } else { &conn.from_id };
+                    scene.components.iter().any(|c| c.id == *other_id && c.kind == "inverter" && c.inv_type == "hybrid")
+                } else {
+                    false
+                }
+            });
+
+            if is_connected_to_mppt || is_connected_to_hybrid {
                 total_panel_watt += comp.value;
-            } else if comp.kind == "battery" {
-                total_storage += comp.value;
             }
+        } else if comp.kind == "battery" {
+            total_storage += comp.value;
+            has_battery = true;
         }
     }
 
-    // 3. Output hanya muncul jika ada Inverter
-    let ac_output = if has_connected_inverter {
-        (total_panel_watt * 0.85) / 1000.0 // Anggap efisiensi 85%
+    // Hitung total beban
+    let mut total_load_watt = 0.0;
+    for comp in &scene.components {
+        if comp.kind == "load" {
+            total_load_watt += comp.value;
+        }
+    }
+
+    // Hitung efisiensi berdasarkan sistem
+    // Jika ada MPPT + Off-grid inverter: eff = 0.95 * 0.90 = 0.855
+    // Jika ada Hybrid inverter: eff = 0.96 (sudah termasuk MPPT)
+    let system_eff = if has_connected_mppt && has_connected_inverter {
+        0.95 * 0.90 // MPPT * Off-grid inverter
+    } else if has_connected_inverter {
+        0.96 // Hybrid inverter efficiency
+    } else {
+        0.85 // Default fallback
+    };
+
+    // Output hanya muncul jika ada Inverter yang terhubung
+    let ac_output = if has_connected_inverter || has_connected_mppt {
+        (total_panel_watt * system_eff) / 1000.0 // Convert ke kW
     } else {
         0.0
     };
+
+    // Balance: produksi vs beban
+    let production_watt = ac_output * 1000.0;
+    let balance_watt = production_watt - total_load_watt;
 
     // Kirim hasil lengkap
     #[derive(serde::Serialize)]
@@ -66,10 +125,17 @@ pub fn calculate_solar_power(js_data: JsValue) -> JsValue {
         ac_output: f64,
         storage_capacity: f64,
         message: String,
+        total_load: f64,
+        balance: f64,
+        total_panel_watt: f64,
+        has_mppt: bool,
+        has_battery: bool,
     }
 
-    let message = if !has_connected_inverter && total_panel_watt > 0.0 {
-        "⚠️ Tambahkan & hubungkan Inverter!".to_string()
+    let message = if !has_connected_inverter && !has_connected_mppt && total_panel_watt > 0.0 {
+        "⚠️ Hubungkan Panel ke MPPT/Inverter!".to_string()
+    } else if total_panel_watt > 0.0 && has_connected_mppt && !has_connected_inverter {
+        "⚠️ Hubungkan MPPT ke Inverter!".to_string()
     } else if total_panel_watt > 0.0 {
         "✅ Sistem Menghasilkan Listrik".to_string()
     } else {
@@ -80,6 +146,11 @@ pub fn calculate_solar_power(js_data: JsValue) -> JsValue {
         ac_output,
         storage_capacity: total_storage,
         message,
+        total_load: total_load_watt,
+        balance: balance_watt,
+        total_panel_watt,
+        has_mppt: has_connected_mppt,
+        has_battery,
     }).unwrap()
 }
 

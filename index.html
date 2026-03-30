@@ -6,7 +6,26 @@
     <style>
         body { font-family: sans-serif; display: flex; height: 100vh; margin: 0; overflow: hidden; }
         #sidebar { width: 280px; background: #2c3e50; color: white; padding: 20px; overflow-y: auto; height: 100vh; box-sizing: border-box; }
-        #canvas { flex-grow: 1; position: relative; background: #ecf0f1; overflow: hidden; }
+        #canvas { flex-grow: 1; position: relative; background: #ecf0f1; overflow: hidden; transition: background 2s ease; }
+        #canvas.night { background: #1a1a2e; }
+        #canvas.dawn { background: linear-gradient(to bottom, #ff6b6b, #feca57, #48dbfb); }
+        #canvas.dusk { background: linear-gradient(to bottom, #2d1b69, #ff6b6b, #feca57); }
+        .sim-controls { margin-top: 15px; padding-top: 15px; border-top: 1px solid #7f8c8d; }
+        .sim-controls .time-display { text-align: center; font-size: 22px; font-weight: bold; color: #f1c40f; margin-bottom: 5px; }
+        .sim-controls .time-label { text-align: center; font-size: 11px; color: #bdc3c7; margin-bottom: 8px; }
+        .sim-controls .battery-bar-wrap { background: rgba(255,255,255,0.1); border-radius: 6px; height: 16px; overflow: hidden; margin-bottom: 5px; }
+        .sim-controls .battery-bar { height: 100%; background: linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71); border-radius: 6px; transition: width 0.5s; }
+        .sim-controls .battery-label { display: flex; justify-content: space-between; font-size: 10px; color: #bdc3c7; margin-bottom: 8px; }
+        .sim-controls .sim-btns { display: flex; gap: 5px; }
+        .sim-controls .sim-btns button { flex: 1; padding: 6px; font-size: 11px; border: none; border-radius: 4px; cursor: pointer; }
+        .sim-controls .btn-play { background: #2ecc71; color: white; }
+        .sim-controls .btn-play:hover { background: #27ae60; }
+        .sim-controls .btn-pause { background: #e67e22; color: white; }
+        .sim-controls .btn-pause:hover { background: #d35400; }
+        .sim-controls .btn-reset { background: #34495e; color: white; }
+        .sim-controls .btn-reset:hover { background: #2c3e50; }
+        .sim-speed { display: flex; align-items: center; gap: 5px; margin-top: 5px; font-size: 10px; color: #bdc3c7; }
+        .sim-speed input { flex: 1; accent-color: #3498db; }
         .component {
             width: 100px; padding: 10px; background: white; border: 2px solid #34495e;
             position: absolute; cursor: pointer; text-align: center; border-radius: 8px;
@@ -14,6 +33,7 @@
         .selected { border-color: #e74c3c; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
         .btn { background: #3498db; color: white; border: none; padding: 10px; width: 100%; margin-bottom: 10px; cursor: pointer; border-radius: 5px; }
         .btn:hover { background: #2980b9; }
+        .btn-sm { padding: 6px 8px; font-size: 11px; margin-bottom: 4px; }
         #stats { margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px; }
         #savings { margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px; }
         #savings input { width: 100%; padding: 5px; margin-top: 5px; box-sizing: border-box; border-radius: 4px; border: none; }
@@ -35,25 +55,141 @@
         #efficiency-section .flow-label { width: 55px; text-align: right; font-size: 10px; color: #bdc3c7; }
         #efficiency-section .overall-eff { text-align: center; margin-top: 10px; padding: 8px; background: rgba(46, 204, 113, 0.2); border-radius: 8px; }
         #efficiency-section .overall-eff span { font-size: 18px; font-weight: bold; color: #2ecc71; }
-        #wire-layer {
-    pointer-events: none; /* Garis tidak boleh menghalangi klik ke kotak */
-    z-index: 1;
-}
-#components-layer {
-    z-index: 2;
-    position: relative;
-}
-.selected { 
-    outline: 3px solid #f1c40f; /* Warna kuning agar terlihat jelas saat dipilih */
-}
+        #wire-layer { pointer-events: none; z-index: 1; }
+        #components-layer { z-index: 2; position: relative; }
+        .selected { outline: 3px solid #f1c40f; }
+        #load-section { margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px; }
+        #load-section .load-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        #load-section .load-total { text-align: center; margin-top: 10px; padding: 10px; background: rgba(231, 76, 60, 0.2); border-radius: 8px; }
+        #load-section .load-total span { font-size: 18px; font-weight: bold; color: #e74c3c; }
+        #edit-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; align-items: center; justify-content: center; }
+        #edit-modal.open { display: flex; }
+        #edit-modal .modal-content { background: #2c3e50; padding: 25px; border-radius: 12px; width: 300px; color: white; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        #edit-modal .modal-content h3 { margin: 0 0 15px; display: flex; align-items: center; gap: 8px; }
+        #edit-modal .modal-row { margin-bottom: 12px; }
+        #edit-modal .modal-row label { display: block; font-size: 12px; color: #bdc3c7; margin-bottom: 5px; }
+        #edit-modal .modal-row input { width: 100%; padding: 8px; border-radius: 6px; border: none; box-sizing: border-box; font-size: 14px; }
+        #edit-modal .modal-row input:focus { outline: 2px solid #3498db; }
+        #edit-modal .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        #edit-modal .modal-actions button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        #edit-modal .btn-save { background: #2ecc71; color: white; }
+        #edit-modal .btn-save:hover { background: #27ae60; }
+        #edit-modal .btn-delete { background: #e74c3c; color: white; }
+        #edit-modal .btn-delete:hover { background: #c0392b; }
+        #edit-modal .btn-cancel { background: #7f8c8d; color: white; }
+        #edit-modal .btn-cancel:hover { background: #636e72; }
     </style>
 </head>
 <body>
     <div id="sidebar">
         <h3>Menu Komponen</h3>
-        <button class="btn" onclick="addComponent('panel', 300)">+ Tambah Panel (300W)</button>
-        <button class="btn" onclick="addComponent('inverter', 0.9)">+ Tambah Inverter</button>
-        <button class="btn" onclick="addComponent('battery', 1200)">+ Tambah Baterai (1.2kWh)</button>
+
+        <!-- Panel Surya -->
+        <div class="comp-menu" style="margin-bottom:8px;">
+            <div class="comp-header" onclick="toggleMenu('panel-menu')" style="cursor:pointer;background:#34495e;padding:8px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;">
+                <span>☀️ Panel Surya</span><span class="arrow" id="arrow-panel-menu">▼</span>
+            </div>
+            <div id="panel-menu" class="comp-options" style="display:none;padding:8px 0;">
+                <button class="btn btn-sm" onclick="addComponent('panel',300)">300W</button>
+                <button class="btn btn-sm" onclick="addComponent('panel',400)">400W</button>
+                <button class="btn btn-sm" onclick="addComponent('panel',450)">450W</button>
+                <button class="btn btn-sm" onclick="addComponent('panel',500)">500W</button>
+            </div>
+        </div>
+
+        <!-- MPPT Charge Controller -->
+        <div class="comp-menu" style="margin-bottom:8px;">
+            <div class="comp-header" onclick="toggleMenu('mppt-menu')" style="cursor:pointer;background:#34495e;padding:8px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;">
+                <span>⚡ MPPT Controller</span><span class="arrow" id="arrow-mppt-menu">▼</span>
+            </div>
+            <div id="mppt-menu" class="comp-options" style="display:none;padding:8px 0;">
+                <div style="font-size:10px;color:#bdc3c7;margin-bottom:5px;">12V System:</div>
+                <button class="btn btn-sm" onclick="addMppt(12,10)">12V 10A</button>
+                <button class="btn btn-sm" onclick="addMppt(12,20)">12V 20A</button>
+                <button class="btn btn-sm" onclick="addMppt(12,30)">12V 30A</button>
+                <div style="font-size:10px;color:#bdc3c7;margin:8px 0 5px;">24V System:</div>
+                <button class="btn btn-sm" onclick="addMppt(24,20)">24V 20A</button>
+                <button class="btn btn-sm" onclick="addMppt(24,30)">24V 30A</button>
+                <button class="btn btn-sm" onclick="addMppt(24,45)">24V 45A</button>
+                <div style="font-size:10px;color:#bdc3c7;margin:8px 0 5px;">48V System:</div>
+                <button class="btn btn-sm" onclick="addMppt(48,30)">48V 30A</button>
+                <button class="btn btn-sm" onclick="addMppt(48,50)">48V 50A</button>
+                <button class="btn btn-sm" onclick="addMppt(48,60)">48V 60A</button>
+            </div>
+        </div>
+
+        <!-- Off-Grid Inverter -->
+        <div class="comp-menu" style="margin-bottom:8px;">
+            <div class="comp-header" onclick="toggleMenu('offgrid-menu')" style="cursor:pointer;background:#34495e;padding:8px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;">
+                <span>🔌 Off-Grid Inverter</span><span class="arrow" id="arrow-offgrid-menu">▼</span>
+            </div>
+            <div id="offgrid-menu" class="comp-options" style="display:none;padding:8px 0;">
+                <div style="font-size:10px;color:#bdc3c7;margin-bottom:5px;">12V Inverter:</div>
+                <button class="btn btn-sm" onclick="addInverter('offgrid',12,1000)">12V 1000W</button>
+                <button class="btn btn-sm" onclick="addInverter('offgrid',12,1500)">12V 1500W</button>
+                <button class="btn btn-sm" onclick="addInverter('offgrid',12,2000)">12V 2000W</button>
+                <div style="font-size:10px;color:#bdc3c7;margin:8px 0 5px;">24V Inverter:</div>
+                <button class="btn btn-sm" onclick="addInverter('offgrid',24,2000)">24V 2000W</button>
+                <button class="btn btn-sm" onclick="addInverter('offgrid',24,3000)">24V 3000W</button>
+                <button class="btn btn-sm" onclick="addInverter('offgrid',24,4000)">24V 4000W</button>
+                <div style="font-size:10px;color:#bdc3c7;margin:8px 0 5px;">48V Inverter:</div>
+                <button class="btn btn-sm" onclick="addInverter('offgrid',48,4000)">48V 4000W</button>
+                <button class="btn btn-sm" onclick="addInverter('offgrid',48,5000)">48V 5000W</button>
+                <button class="btn btn-sm" onclick="addInverter('offgrid',48,8000)">48V 8000W</button>
+            </div>
+        </div>
+
+        <!-- Hybrid Inverter (MPPT Hybrid) -->
+        <div class="comp-menu" style="margin-bottom:8px;">
+            <div class="comp-header" onclick="toggleMenu('hybrid-menu')" style="cursor:pointer;background:#34495e;padding:8px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;">
+                <span>🔄 Hybrid Inverter</span><span class="arrow" id="arrow-hybrid-menu">▼</span>
+            </div>
+            <div id="hybrid-menu" class="comp-options" style="display:none;padding:8px 0;">
+                <div style="font-size:10px;color:#bdc3c7;margin-bottom:5px;">24V Hybrid:</div>
+                <button class="btn btn-sm" onclick="addInverter('hybrid',24,3000)">24V 3000W</button>
+                <button class="btn btn-sm" onclick="addInverter('hybrid',24,5000)">24V 5000W</button>
+                <div style="font-size:10px;color:#bdc3c7;margin:8px 0 5px;">48V Hybrid:</div>
+                <button class="btn btn-sm" onclick="addInverter('hybrid',48,5000)">48V 5000W</button>
+                <button class="btn btn-sm" onclick="addInverter('hybrid',48,8000)">48V 8000W</button>
+                <button class="btn btn-sm" onclick="addInverter('hybrid',48,10000)">48V 10000W</button>
+            </div>
+        </div>
+
+        <!-- Baterai -->
+        <div class="comp-menu" style="margin-bottom:8px;">
+            <div class="comp-header" onclick="toggleMenu('battery-menu')" style="cursor:pointer;background:#34495e;padding:8px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;">
+                <span>🔋 Baterai</span><span class="arrow" id="arrow-battery-menu">▼</span>
+            </div>
+            <div id="battery-menu" class="comp-options" style="display:none;padding:8px 0;">
+                <div style="font-size:10px;color:#bdc3c7;margin-bottom:5px;">12V Battery:</div>
+                <button class="btn btn-sm" onclick="addBattery(12,100)">12V 100Ah</button>
+                <button class="btn btn-sm" onclick="addBattery(12,150)">12V 150Ah</button>
+                <button class="btn btn-sm" onclick="addBattery(12,200)">12V 200Ah</button>
+                <div style="font-size:10px;color:#bdc3c7;margin:8px 0 5px;">24V Battery (2x12V):</div>
+                <button class="btn btn-sm" onclick="addBattery(24,100)">24V 100Ah</button>
+                <button class="btn btn-sm" onclick="addBattery(24,150)">24V 150Ah</button>
+                <button class="btn btn-sm" onclick="addBattery(24,200)">24V 200Ah</button>
+                <div style="font-size:10px;color:#bdc3c7;margin:8px 0 5px;">48V Battery (4x12V):</div>
+                <button class="btn btn-sm" onclick="addBattery(48,100)">48V 100Ah</button>
+                <button class="btn btn-sm" onclick="addBattery(48,150)">48V 150Ah</button>
+                <button class="btn btn-sm" onclick="addBattery(48,200)">48V 200Ah</button>
+            </div>
+        </div>
+
+        <!-- Beban -->
+        <div class="comp-menu" style="margin-bottom:8px;">
+            <div class="comp-header" onclick="toggleMenu('load-menu')" style="cursor:pointer;background:#34495e;padding:8px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;">
+                <span>🏠 Beban/Rumah</span><span class="arrow" id="arrow-load-menu">▼</span>
+            </div>
+            <div id="load-menu" class="comp-options" style="display:none;padding:8px 0;">
+                <button class="btn btn-sm" onclick="addLoad(100)">100W</button>
+                <button class="btn btn-sm" onclick="addLoad(300)">300W</button>
+                <button class="btn btn-sm" onclick="addLoad(500)">500W</button>
+                <button class="btn btn-sm" onclick="addLoad(1000)">1000W</button>
+                <button class="btn btn-sm" onclick="addLoad(2000)">2000W</button>
+                <button class="btn btn-sm" onclick="addLoad(3500)">3500W</button>
+            </div>
+        </div>
         <div id="stats">
             <strong>Output Sistem:</strong>
             <h2 id="power-display">0.00 kW</h2>
@@ -63,7 +199,7 @@
             <strong>Kalkulator Penghematan:</strong>
             <div class="input-group">
                 <label>Tarif Listrik (Rp/kWh):</label>
-                <input type="number" id="rate" value="1500" min="0" step="100" onchange="window.onrateChange()">
+                <input type="number" id="rate" value="1500" min="0" step="100">
             </div>
             <div id="savings-result">
                 <table>
@@ -114,17 +250,72 @@
         <div id="chart-section">
             <strong>Grafik Produksi:</strong>
             <div class="tab-buttons">
-                <button class="tab-btn active" onclick="setChartMode('daily')">Harian</button>
-                <button class="tab-btn" onclick="setChartMode('weekly')">Mingguan</button>
+                <button class="tab-btn active" id="tab-daily">Harian</button>
+                <button class="tab-btn" id="tab-weekly">Mingguan</button>
             </div>
             <canvas id="production-chart" width="240" height="120"></canvas>
         </div>
+        <div id="load-section">
+            <strong>⚡ Beban/Rumah:</strong>
+            <div id="load-items"></div>
+            <div class="load-total">
+                Total Konsumsi: <span id="total-load">0 W</span>
+            </div>
+            <div id="load-balance" style="text-align:center; margin-top:8px; font-size:11px; color:#bdc3c7;"></div>
+        </div>
+        <div id="battery-section" style="margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px;">
+            <strong>🔋 Baterai:</strong>
+            <div class="battery-label"><span>Charge</span><span id="battery-percent">0%</span></div>
+            <div class="battery-bar-wrap"><div id="battery-bar" class="battery-bar" style="width:0%"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:#bdc3c7;">
+                <span id="battery-wh">0 Wh</span><span id="battery-mode">Idle</span>
+            </div>
+        </div>
+        <div class="sim-controls">
+            <strong>🌍 Simulasi Waktu</strong>
+            <div class="time-display" id="sim-time">06:00</div>
+            <div class="time-label" id="sim-phase">🌅 Pagi</div>
+            <div class="battery-label"><span>Baterai</span><span id="sim-battery-pct">0%</span></div>
+            <div class="battery-bar-wrap"><div id="sim-battery-bar" class="battery-bar" style="width:0%"></div></div>
+            <div class="sim-btns">
+                <button id="sim-btn">▶ Mulai</button>
+                <button id="sim-reset">↺ Reset</button>
+            </div>
+            <div class="sim-speed">
+                <span>🐢</span><input type="range" id="sim-speed" min="1" max="60" value="10"><span>🐇</span>
+                <span id="sim-speed-label">10x</span>
+            </div>
+            <div style="font-size:9px;color:#636e72;text-align:center;margin-top:5px;">1 menit = 1 detik real</div>
+        </div>
     </div>
     <div id="canvas">
-    <svg id="wire-layer" style="position:absolute; width:100%; height:100%; pointer-events:none;"></svg>
+    <div id="sun-indicator" style="position:absolute;font-size:28px;transition:all 1s ease;pointer-events:none;z-index:0;">☀️</div>
+    <canvas id="wire-layer" style="position:absolute; width:100%; height:100%;"></canvas>
     <div id="components-layer"></div>
     </div>
 
     <script type="module" src="main.js"></script>
+    <div id="edit-modal">
+        <div class="modal-content">
+            <h3 id="modal-title">🏠 Edit Komponen</h3>
+            <div class="modal-row">
+                <label>Jenis:</label>
+                <input type="text" id="modal-kind" readonly style="background:#34495e;color:#bdc3c7;cursor:not-allowed;">
+            </div>
+            <div class="modal-row" id="row-wattage">
+                <label id="label-wattage">Daya (Watt):</label>
+                <input type="number" id="modal-value" min="1" step="1">
+            </div>
+            <div class="modal-row" id="row-capacity" style="display:none;">
+                <label>Kapasitas (Wh):</label>
+                <input type="number" id="modal-capacity" min="1" step="1">
+            </div>
+            <div class="modal-actions">
+                <button id="modal-save" class="btn-save">💾 Simpan</button>
+                <button id="modal-delete" class="btn-delete">🗑️ Hapus</button>
+                <button id="modal-cancel" class="btn-cancel">✕ Batal</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
